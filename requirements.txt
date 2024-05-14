@@ -1,0 +1,10 @@
+flask
+Flask-SQLAlchemy
+functools
+datetime
+reportlab
+apscheduler
+pandas
+sendgrid
+base64
+os
