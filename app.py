@@ -6,13 +6,13 @@ from datetime import date
 from reportlab.pdfgen import canvas
 from flask import send_file
 from apscheduler.schedulers.background import BackgroundScheduler
-import pandas as pd 
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import (Mail, Attachment, FileContent, FileName, FileType, Disposition)
 import base64, os
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///contacts.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///employees.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 scheduler = BackgroundScheduler()
 
@@ -39,36 +39,22 @@ class Employee(db.Model):
             'salary': self.salary,
             'password': self.password
         }
-        
-# Función para guardar como archivo Excel (xlsx)
-def save_to_excel():
-    employees = Employee.query.all()
-    data = [employee.serialize() for employee in employees]
-    df = pd.DataFrame(data)
-    df.to_excel('employees.xlsx', index=False)
-
-# Función para leer datos desde un archivo Excel (xlsx)
-def load_from_excel():
-    df = pd.read_excel('employees.xlsx')
-    for index, row in df.iterrows():
-        employee = Employee(
-            id=row['id'],
-            name=row['name'],
-            email=row['email'],
-            phone=row['phone'],
-            direction=row['direction'],
-            department=row['department'],
-            salary=row['salary'],
-            password=row['password']
-        )
-        db.session.add(employee)
+    
+# Función para añadir registros de empleados predeterminados
+def add_default_employees():
+    db.session.add(Employee(name="Natalia", phone="(345) 389-6780", direction="105-30 Union St.", email="natalia.osejoh@utadeo.edu.co", department="HR", salary=50000, password='password'))
+    db.session.add(Employee(name="Cristian", phone="(123) 379-7895", direction="320 Madison St.", email="cristiand.reyesv@utadeo.edu.co", department="IT", salary=20000, password='password'))
+    db.session.add(Employee(name="Jonathan", phone="(456) 389-7823", direction="N2W1700 County Rd.", email="jonathana.perillag@utadeo.edu.co", department="Finance", salary=70000, password='password'))
     db.session.commit()
 
-# Crear las tablas en la base de datos y cargar datos desde el archivo Excel
+# Verificar si la base de datos existe y cargarla, o crearla con registros predeterminados
 with app.app_context():
-    db.drop_all()
-    db.create_all()
-    load_from_excel()
+    if not os.path.exists('instance/contacts.db'):
+        db.drop_all()
+        db.create_all()
+        add_default_employees()
+    else:
+        db.create_all()
 
 # Pagina raiz de la API
 @app.route('/')
@@ -93,7 +79,7 @@ def get_employee(id):
         return jsonify({'message': 'Empleado no encontrado'}), 404
     return jsonify(employee.serialize())
 
-# Inicio de sesión, permisos de gestión humana (creación, eliminación y edición de usuarios)
+#-------------- Inicio de sesión, permisos de gestión humana (creación, eliminación y edición de usuarios)
 # Función para verificar la autenticación del usuario y su rol
 def authenticate(email, password):
     user = Employee.query.filter_by(email=email, password=password).first()
@@ -152,7 +138,7 @@ def update_personal_info():
             if 'password' in data:
                 user.password = data['password']
             db.session.commit()
-            save_to_excel()
+
             return jsonify({'message': 'Información personal actualizada exitosamente','my info':user.serialize()}), 200
     else:
         return jsonify({'message': 'Error: No se pudo actualizar la información personal'}), 500
@@ -188,7 +174,6 @@ def update_employee(id):
                     employee.salary = data['salary']
                 
                 db.session.commit()
-                save_to_excel()
                 return jsonify({'message': 'Información del empleado actualizada con exito','employee':employee.serialize()}), 200
     else:
         return jsonify({'message': 'Error: No se pudo actualizar el registro'}), 500
@@ -208,7 +193,7 @@ def delete_employee(id):
         else:
             db.session.delete(employee)
             db.session.commit()
-            save_to_excel()
+
             return jsonify({'message': 'Empleado despedido con éxito'})
     else:
         return jsonify({'message': 'Error: No se pudo borrar el registro'}), 500
@@ -221,7 +206,6 @@ def create_employee():
     employee =  Employee(name = data['name'], email = data['email'], phone = data['phone'], direction = data['direction'], department = data['department'], salary = data['salary'], password = "password")
     db.session.add(employee)
     db.session.commit()
-    save_to_excel()
     return jsonify({'message': 'Empleado contratado con exito','employee':employee.serialize()}), 201
 
 #------------- Desprendible de pagos
@@ -270,7 +254,8 @@ def report():
     send_email(email, invoice_encoded, pdf_path)
     return send_file(pdf_path, as_attachment=True)
 
-# Función para generar desprendibles de pagos de todos los usuarios usada por la función send_invoices()
+#------- Emails y notificaciones
+# Función para generar desprendibles de pagos de todos los usuarios usada por la función send_invoices()  
 def report_all(id):
     employee = db.session.get(Employee, id)
     if not employee:
@@ -304,6 +289,7 @@ def report_all(id):
     pdf.drawText(info)
     pdf.drawText(text)
     pdf.save()
+
     return pdf_path
 
 # Función para enviar un correo electronico a una dirección de destino (receiver), con un archivo comprimido a base64 (base64_file) y la ruta en que se encuentra el archivo PDF (pdf_path)
@@ -342,6 +328,7 @@ def send_invoices():
                 invoice_data = file.read()
                 invoice_encoded = base64.b64encode(invoice_data).decode()
             send_email(employee.email, invoice_encoded, pdf_path)
+
         return jsonify({'message': 'Pagos de nominas enviados exitosamente'}), 200
 
 # Programar el envio de correo para que se ejecute a las 6pm todos los días
