@@ -1,3 +1,4 @@
+# Importar las librerias y dependencias utilizadas
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from functools import wraps
@@ -15,7 +16,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///contacts.db'
 db = SQLAlchemy(app)
 scheduler = BackgroundScheduler()
 
-#Crear modelo de la base de datos empleados
+# Crea el modelo de Empleado de la base de datos
 class Employee(db.Model):
     id = db.Column(db.Integer, primary_key = True)
     name = db.Column(db.String(50), nullable = False)
@@ -26,6 +27,7 @@ class Employee(db.Model):
     salary = db.Column(db.Integer, nullable = False)
     password = db.Column(db.String(50), nullable = False)
 
+    # Función para convertir los datos a formato JSON
     def serialize(self):
         return {
             'id': self.id,
@@ -37,13 +39,15 @@ class Employee(db.Model):
             'salary': self.salary,
             'password': self.password
         }
-    
+        
+# Función para guardar como archivo Excel (xlsx)
 def save_to_excel():
     employees = Employee.query.all()
     data = [employee.serialize() for employee in employees]
     df = pd.DataFrame(data)
     df.to_excel('employees.xlsx', index=False)
 
+# Función para leer datos desde un archivo Excel (xlsx)
 def load_from_excel():
     df = pd.read_excel('employees.xlsx')
     for index, row in df.iterrows():
@@ -66,11 +70,12 @@ with app.app_context():
     db.create_all()
     load_from_excel()
 
+# Pagina raiz de la API
 @app.route('/')
 def root():
     return 'Bienvenido a la API REST de Nomina, desarrollada por Natalia Osejo, Jonathan Perilla, Cristian Reyes'
 
-# Crear las rutas 
+# Crear las diferentes rutas 
 # http://127.0.0.1:5000/employees - Para ver empleados
 @app.route('/employees', methods = ['GET'])
 def get_employees():
@@ -88,7 +93,7 @@ def get_employee(id):
         return jsonify({'message': 'Empleado no encontrado'}), 404
     return jsonify(employee.serialize())
 
-#-------------- Inicio de sesión, permisos de gestión humana (creación, eliminación y edición de usuarios)
+# Inicio de sesión, permisos de gestión humana (creación, eliminación y edición de usuarios)
 # Función para verificar la autenticación del usuario y su rol
 def authenticate(email, password):
     user = Employee.query.filter_by(email=email, password=password).first()
@@ -148,7 +153,6 @@ def update_personal_info():
                 user.password = data['password']
             db.session.commit()
             save_to_excel()
-
             return jsonify({'message': 'Información personal actualizada exitosamente','my info':user.serialize()}), 200
     else:
         return jsonify({'message': 'Error: No se pudo actualizar la información personal'}), 500
@@ -185,7 +189,6 @@ def update_employee(id):
                 
                 db.session.commit()
                 save_to_excel()
-
                 return jsonify({'message': 'Información del empleado actualizada con exito','employee':employee.serialize()}), 200
     else:
         return jsonify({'message': 'Error: No se pudo actualizar el registro'}), 500
@@ -206,7 +209,6 @@ def delete_employee(id):
             db.session.delete(employee)
             db.session.commit()
             save_to_excel()
-
             return jsonify({'message': 'Empleado despedido con éxito'})
     else:
         return jsonify({'message': 'Error: No se pudo borrar el registro'}), 500
@@ -220,7 +222,6 @@ def create_employee():
     db.session.add(employee)
     db.session.commit()
     save_to_excel()
-
     return jsonify({'message': 'Empleado contratado con exito','employee':employee.serialize()}), 201
 
 #------------- Desprendible de pagos
@@ -269,6 +270,7 @@ def report():
     send_email(email, invoice_encoded, pdf_path)
     return send_file(pdf_path, as_attachment=True)
 
+# Función para generar desprendibles de pagos de todos los usuarios usada por la función send_invoices()
 def report_all(id):
     employee = db.session.get(Employee, id)
     if not employee:
@@ -304,6 +306,7 @@ def report_all(id):
     pdf.save()
     return pdf_path
 
+# Función para enviar un correo electronico a una dirección de destino (receiver), con un archivo comprimido a base64 (base64_file) y la ruta en que se encuentra el archivo PDF (pdf_path)
 def send_email(receiver, base64_file, pdf_path)-> bool:
     # Configura la API de SendGrid con tu clave API
     sg = SendGridAPIClient('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')
@@ -328,6 +331,7 @@ def send_email(receiver, base64_file, pdf_path)-> bool:
     response = sg.send(message)
     print(response.status_code)
 
+# Endpoint para enviar desprendibles de pagos a todos los empleados
 @app.route('/send-invoices', methods=['GET'])
 def send_invoices():
     with app.app_context():
@@ -338,13 +342,13 @@ def send_invoices():
                 invoice_data = file.read()
                 invoice_encoded = base64.b64encode(invoice_data).decode()
             send_email(employee.email, invoice_encoded, pdf_path)
-
         return jsonify({'message': 'Pagos de nominas enviados exitosamente'}), 200
 
-# Programar el envio de correo para que se ejecute a las 7pm todos los días
+# Programar el envio de correo para que se ejecute a las 6pm todos los días
 with app.app_context():
-    scheduler.add_job(send_invoices, 'cron', hour=21, minute=34)
+    scheduler.add_job(send_invoices, 'cron', hour=18, minute=00)
     scheduler.start()
 
+# Ejecutar la API 
 if __name__ == '__main__':
     app.run(debug=True)
