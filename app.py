@@ -251,7 +251,7 @@ def report():
         invoice_data = file.read()
         invoice_encoded = base64.b64encode(invoice_data).decode()
 
-    send_email(email, invoice_encoded, pdf_path)
+    _email(email, invoice_encoded, pdf_path)
     return send_file(pdf_path, as_attachment=True)
 
 #------- Emails y notificaciones
@@ -295,7 +295,7 @@ def report_all(id):
 # Función para enviar un correo electronico a una dirección de destino (receiver), con un archivo comprimido a base64 (base64_file) y la ruta en que se encuentra el archivo PDF (pdf_path)
 def send_email(receiver, base64_file, pdf_path)-> bool:
     # Configura la API de SendGrid con tu clave API
-    sg = SendGridAPIClient('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')
+    sg = SendGridAPIClient(SENDGRID_API_TOKEN)
 
     # Crea el objeto adjunto
     adjunto = Attachment(
