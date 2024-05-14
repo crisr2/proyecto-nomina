@@ -9,4 +9,4 @@ La API tiene varias rutas para obtener información de los empleados, actualizar
 
 El código incluye una función de autenticación que verifica las credenciales de inicio de sesión y los permisos de usuario. La función de autenticación utiliza Basic Auth dentro de Postman para autenticar al usuario, además se utiliza APScheduler para programar el envío de informes de pago a los empleados a las 6pm todos los días por medio de SendGrid API para el envio de los correos electrónicos a los empleados.
 
-La lista de dependencias y librerias utilizadas se encuentra en requirements.txt
+La lista de dependencias y librerias utilizadas se encuentran en el archivo requirements.txt
