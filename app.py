@@ -251,7 +251,7 @@ def report():
         invoice_data = file.read()
         invoice_encoded = base64.b64encode(invoice_data).decode()
 
-    _email(email, invoice_encoded, pdf_path)
+    send_email(email, invoice_encoded, pdf_path)
     return send_file(pdf_path, as_attachment=True)
 
 #------- Emails y notificaciones
